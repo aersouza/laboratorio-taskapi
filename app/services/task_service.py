@@ -1,138 +1,72 @@
-"""
-Módulo de serviços para operações de tarefas.
-
-Este módulo contém a lógica de negócio para CRUD de tarefas,
-separada dos endpoints para melhor testabilidade e reutilização.
-"""
+"""Serviço de tarefas que separa regra de negócio da camada de API."""
 
 from typing import List, Optional
-from sqlalchemy.orm import Session
-from app.models.task import Task, TaskStatus
-from app.schemas.task import TaskCreate, TaskUpdate
+
+from app.models.task import TaskCreate, TaskOut, TaskStatus, TaskUpdate
+from app.repositories.task_repository import TaskRepository
+from app.services.priority_advisor import PriorityAdvisor
 
 
 class TaskService:
-    """Serviço que encapsula a lógica de negócio para tarefas."""
+    """Camada de serviço para operações de tarefas."""
 
-    @staticmethod
-    def create_task(db: Session, task: TaskCreate) -> Task:
-        """
-        Cria uma nova tarefa no banco de dados.
-        
-        Args:
-            db (Session): Sessão do banco de dados.
-            task (TaskCreate): Dados da tarefa a ser criada.
-        
-        Returns:
-            Task: Tarefa criada com ID gerado.
-        """
-        db_task = Task(**task.model_dump())
-        db.add(db_task)
-        db.commit()
-        db.refresh(db_task)
-        return db_task
+    def __init__(self, repository: TaskRepository, advisor: PriorityAdvisor) -> None:
+        self._repository = repository
+        self._advisor = advisor
 
-    @staticmethod
-    def get_tasks(
-        db: Session,
+    def create_task(self, payload: TaskCreate) -> TaskOut:
+        """Cria uma tarefa com sugestão de prioridade."""
+        suggestion = self._advisor.analyze_task(
+            title=payload.title,
+            description=payload.description,
+        )
+        return self._repository.create(payload, priority_suggestion=suggestion)
+
+    def list_tasks(
+        self,
+        status: Optional[TaskStatus] = None,
         skip: int = 0,
-        limit: int = 10,
-        status: Optional[TaskStatus] = None
-    ) -> List[Task]:
-        """
-        Lista tarefas com filtros opcionais.
-        
-        Args:
-            db (Session): Sessão do banco de dados.
-            skip (int): Número de registros a pular (padrão: 0).
-            limit (int): Número máximo de registros a retornar (padrão: 10).
-            status (Optional[TaskStatus]): Filtrar por status (opcional).
-        
-        Returns:
-            List[Task]: Lista de tarefas encontradas.
-        """
-        query = db.query(Task)
-        
-        if status:
-            query = query.filter(Task.status == status)
-        
-        return query.offset(skip).limit(limit).all()
+        limit: int = 100,
+    ) -> List[TaskOut]:
+        """Retorna tarefas com filtro de status e paginação."""
+        return self._repository.list(status=status, skip=skip, limit=limit)
 
-    @staticmethod
-    def get_task_by_id(db: Session, task_id: int) -> Optional[Task]:
-        """
-        Obtém uma tarefa pelo ID.
-        
-        Args:
-            db (Session): Sessão do banco de dados.
-            task_id (int): ID da tarefa a ser recuperada.
-        
-        Returns:
-            Optional[Task]: Tarefa encontrada ou None.
-        """
-        return db.query(Task).filter(Task.id == task_id).first()
+    def get_task_by_id(self, task_id: int) -> Optional[TaskOut]:
+        """Busca uma tarefa pelo ID."""
+        return self._repository.get_by_id(task_id)
 
-    @staticmethod
-    def update_task(db: Session, task_id: int, task_update: TaskUpdate) -> Optional[Task]:
-        """
-        Atualiza uma tarefa existente.
-        
-        Args:
-            db (Session): Sessão do banco de dados.
-            task_id (int): ID da tarefa a ser atualizada.
-            task_update (TaskUpdate): Novos dados da tarefa.
-        
-        Returns:
-            Optional[Task]: Tarefa atualizada ou None se não encontrada.
-        """
-        db_task = TaskService.get_task_by_id(db, task_id)
-        if not db_task:
+    def update_task(self, task_id: int, payload: TaskUpdate) -> Optional[TaskOut]:
+        """Atualiza tarefa e recalcula sugestão de prioridade quando necessário."""
+        existing = self._repository.get_by_id(task_id)
+        if existing is None:
             return None
-        
-        for key, value in task_update.model_dump().items():
-            setattr(db_task, key, value)
-        
-        db.commit()
-        db.refresh(db_task)
-        return db_task
 
-    @staticmethod
-    def delete_task(db: Session, task_id: int) -> bool:
-        """
-        Deleta uma tarefa pelo ID.
-        
-        Args:
-            db (Session): Sessão do banco de dados.
-            task_id (int): ID da tarefa a ser deletada.
-        
-        Returns:
-            bool: True se a tarefa foi deletada, False se não encontrada.
-        """
-        db_task = TaskService.get_task_by_id(db, task_id)
-        if not db_task:
+        updated = self._repository.update(task_id, payload)
+        if payload.title is not None or payload.description is not None:
+            suggestion = self._advisor.analyze_task(
+                title=updated.title,
+                description=updated.description,
+            )
+            updated = self._repository.update(
+                task_id,
+                payload,
+                priority_suggestion=suggestion,
+            )
+
+        return updated
+
+    def delete_task(self, task_id: int) -> bool:
+        """Remove uma tarefa do repositório."""
+        try:
+            self._repository.delete(task_id)
+            return True
+        except KeyError:
             return False
-        
-        db.delete(db_task)
-        db.commit()
-        return True
 
-    @staticmethod
-    def mark_task_as_completed(db: Session, task_id: int) -> Optional[Task]:
-        """
-        Marca uma tarefa como concluída.
-        
-        Args:
-            db (Session): Sessão do banco de dados.
-            task_id (int): ID da tarefa a ser marcada como concluída.
-        
-        Returns:
-            Optional[Task]: Tarefa atualizada ou None se não encontrada.
-        """
-        db_task = TaskService.get_task_by_id(db, task_id)
-        if not db_task:
+    def mark_task_as_completed(self, task_id: int) -> Optional[TaskOut]:
+        """Marca tarefa como concluída."""
+        payload = TaskUpdate(status=TaskStatus.CONCLUIDA)
+        try:
+            return self._repository.update(task_id, payload)
+        except KeyError:
             return None
-        
-        db_task.status = TaskStatus.CONCLUIDA
-        db.commit()
-        db.refresh(db_task)
-        return db_task
