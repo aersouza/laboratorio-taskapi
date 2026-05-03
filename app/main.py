@@ -7,6 +7,14 @@ de healthcheck para verificar o estado da API.
 
 from datetime import datetime, timezone
 from fastapi import FastAPI
+from pydantic import BaseModel
+
+
+class HealthCheckResponse(BaseModel):
+    """Modelo de resposta para o endpoint de healthcheck."""
+
+    status: str
+    timestamp: str
 
 
 app = FastAPI(
@@ -18,17 +26,17 @@ app = FastAPI(
 )
 
 
-@app.get("/health", tags=["health"])
-def health_check() -> dict[str, str]:
+@app.get("/health", response_model=HealthCheckResponse, tags=["health"])
+def health_check() -> HealthCheckResponse:
     """
     Endpoint de healthcheck da API.
 
     Retorna o status atual do serviço e o timestamp do sistema no momento da requisição.
 
     Returns:
-        dict[str, str]: Dicionário com chaves 'status' e 'timestamp'.
+        HealthCheckResponse: Estado do serviço e carimbo de data/hora em UTC.
     """
-    return {
-        "status": "ok",
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    return HealthCheckResponse(
+        status="ok",
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
