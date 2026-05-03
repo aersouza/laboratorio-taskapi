@@ -41,19 +41,25 @@ class TaskService:
         if existing is None:
             return None
 
-        updated = self._repository.update(task_id, payload)
+        priority_suggestion = None
         if payload.title is not None or payload.description is not None:
+            title = payload.title if payload.title is not None else existing.title
+            description = (
+                payload.description
+                if payload.description is not None
+                else existing.description
+            )
             suggestion = self._advisor.analyze_task(
-                title=updated.title,
-                description=updated.description,
+                title=title,
+                description=description,
             )
-            updated = self._repository.update(
-                task_id,
-                payload,
-                priority_suggestion=suggestion,
-            )
+            priority_suggestion = suggestion
 
-        return updated
+        return self._repository.update(
+            task_id,
+            payload,
+            priority_suggestion=priority_suggestion,
+        )
 
     def delete_task(self, task_id: int) -> bool:
         """Remove uma tarefa do repositório."""
