@@ -1,6 +1,6 @@
 """Rotas HTTP para gerenciamento de tarefas."""
 
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
@@ -39,9 +39,9 @@ def create_task(
 @router.get("/", response_model=list[TaskOut])
 def list_tasks(
     service: TaskServiceDependency,
-    status_filter: Annotated[TaskStatus | None, Query(alias="status")] = None,
-    skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    status_filter: Optional[TaskStatus] = Query(default=None, alias="status"),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
 ) -> list[TaskOut]:
     return service.list_tasks(
         status=status_filter,
