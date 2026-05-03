@@ -51,14 +51,25 @@ O MVP deve garantir:
   - retorna status de serviço `ok` e `timestamp` atual do sistema.
   - utiliza modelo Pydantic para validar o payload de resposta.
 
+### 2.3 Componente de Priorização (PriorityAdvisor)
+- Análise automática de tarefas para sugestão de prioridade
+  - Integrado na criação e atualização de tarefas
+  - Usa algoritmo baseado em palavras-chave, contexto e regras de negócio
+  - Retorna sugestão de prioridade: `baixa`, `média`, `alta` ou `crítica`
+  - Sugestão é informativa; prioridade final é definida pelo cliente
+- `POST /tasks`
+  - resposta inclui campo `priority_suggestion` com recomendação do PriorityAdvisor
+
 ## 3. Requisitos Não Funcionais
 
 ### 3.1 Arquitetura e Organização do Código
-- organização modular em pacotes separados:
-  - `app/models` para entidades SQLAlchemy;
+- organização modular em camadas separadas:
+  - `app/routes` para definições de endpoints (API Layer);
   - `app/schemas` para validação Pydantic;
-  - `app/routes` para definições de endpoints;
-  - `app/services` para lógica de negócio;
+  - `app/services` para lógica de negócio e orquestração;
+  - `app/advisors` para o componente PriorityAdvisor;
+  - `app/repositories` para a Repository Layer (abstração de persistência);
+  - `app/models` para entidades SQLAlchemy;
   - `app/database.py` para configuração de persistência.
 - o ponto de entrada deve ser `app/main.py`.
 - código com tipagem estática `typing` e docstrings explicativas.
@@ -99,7 +110,8 @@ O MVP deve garantir:
 - controle de anexos, upload de arquivos ou mídia;
 - escalabilidade horizontal, cache distribuído ou fila de mensagens;
 - deploy automatizado em ambiente de produção;
-- métricas avançadas de performance, observabilidade ou tracing.
+- métricas avançadas de performance, observabilidade ou tracing;
+- machine learning avançado para priorização (PriorityAdvisor usa regras simples).
 
 ## 5. Entregáveis do MVP
 

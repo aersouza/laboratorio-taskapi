@@ -36,14 +36,16 @@ Este backlog define as tarefas mínimas para entrega do MVP seguindo **desenvolv
   - Estrutura de pastas criada conforme especificado
   - Imports funcionam corretamente entre módulos
 
-### RT-002: Implementar modelos e esquemas Pydantic
-- [ ] Criar modelo Task com campos id, title, description, status
+### RT-002: Implementar modelos, esquemas e Repository Layer
+- [ ] Criar modelo Task com campos id, title, description, status, priority
 - [ ] Definir enum TaskStatus com valores (pendente, em_progresso, concluida)
 - [ ] Criar esquemas Pydantic: TaskBase, TaskCreate, Task
+- [ ] Implementar TaskRepository com métodos CRUD abstratos
 - [ ] Configurar Base e engine SQLAlchemy
 - **Critérios de Aceite:**
-  - Modelo cria tabela corretamente no SQLite
+  - Modelo cria tabela corretamente no SQLite com coluna priority
   - Esquemas validam entrada e serializam saída
+  - Repository fornece interface para CRUD sem exposição SQL direto
 
 ### RT-003: Testes unitários para Release 1
 - [ ] Criar test_tasks.py com testes para POST e GET /tasks
@@ -53,6 +55,16 @@ Este backlog define as tarefas mínimas para entrega do MVP seguindo **desenvolv
 - **Critérios de Aceite:**
   - Testes passam com cobertura >85% para endpoints
   - Validações são testadas (título vazio, muito longo, etc)
+
+### RT-004: Implementar componente PriorityAdvisor básico
+- [ ] Criar advisors/priority.py com classe PriorityAdvisor
+- [ ] Implementar algoritmo simples de priorização baseado em palavras-chave
+- [ ] Método analyze_task retorna sugestão: baixa, média, alta, crítica
+- [ ] Integrar com TaskService para POST /tasks
+- **Critérios de Aceite:**
+  - Resposta POST inclui field priority_suggestion
+  - Palavras-chave críticas (urgente, emergência, bloqueado) marcam como alta/crítica
+  - Sugestão não força, apenas informa ao cliente
 
 ---
 
@@ -116,14 +128,24 @@ Este backlog define as tarefas mínimas para entrega do MVP seguindo **desenvolv
   - Combinação com paginação funciona
 
 ### RT-004: Testes unitários para Release 2
-- [ ] Testar PUT, DELETE, PATCH, GET /{id}
-- [ ] Testar filtros e paginação
+- [ ] Adicionar testes para PUT, DELETE, PATCH, GET /{id}
 - [ ] Testar cenários de erro (ID não encontrado)
+- [ ] Testar atualização parcial e completa
 - [ ] Expandir cobertura para >85%
 - **Critérios de Aceite:**
   - Testes cobrem todas as operações CRUD
   - Filtros e paginação testados
   - Cobertura >85% nos endpoints
+
+### RT-005: Expandir PriorityAdvisor com contexto
+- [ ] Aprimorar algoritmo de priorização com análise de contexto
+- [ ] Considerar comprimento da descrição (mais contexto = análise melhor)
+- [ ] Integrar com GET /tasks para retornar priority_suggestion em listagem
+- [ ] Testar sugestões com casos variados
+- **Critérios de Aceite:**
+  - PriorityAdvisor funciona em POST e GET /tasks
+  - Sugestões são precisas para casos comuns
+  - Cobertura de testes >85%
 
 ---
 
@@ -145,10 +167,20 @@ Este backlog define as tarefas mínimas para entrega do MVP seguindo **desenvolv
 - [ ] Criar test_services.py com testes para lógica de negócio
 - [ ] Testar CRUD completo no TaskService
 - [ ] Testar filtros e paginação
+- [ ] Testar integração com Repository e PriorityAdvisor
 - [ ] Usar fixtures para banco de testes
 - **Critérios de Aceite:**
   - Todos os testes de serviços passam
   - Cobertura >90% nos serviços
+
+### RT-006: Testes para PriorityAdvisor
+- [ ] Criar test_priority_advisor.py com casos de teste
+- [ ] Testar sugestões de prioridade em diversos cenários
+- [ ] Testar integração com TaskService
+- [ ] Validar que sugestões não são forçadas
+- **Critérios de Aceite:**
+  - 100% das funções do PriorityAdvisor testadas
+  - Cobertura >90% no componente
 
 ### RT-006: Adicionar docstrings e type hints completos
 - [ ] Documentar todos os módulos, classes e funções

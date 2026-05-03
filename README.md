@@ -43,7 +43,12 @@ Os requisitos funcionais definem as operações básicas que a API deve suportar
   - Validação: ID deve existir; caso contrário, retorna erro 404.
   - Resposta: Confirmação de exclusão (ex.: status 204 No Content).
 
-Essas operações formam a base funcional da API, garantindo que usuários possam gerenciar tarefas de forma intuitiva. Implemente tratamento de erros para casos como IDs inválidos ou dados malformados.
+- **Sugestão de Prioridade (PriorityAdvisor)**:
+  - Análise automática ao criar ou atualizar tarefa
+  - Campo `priority_suggestion` na resposta com valores: `baixa`, `média`, `alta`, `crítica`
+  - Baseado em análise de título, descrição e palavras-chave
+  - Sugestão é informativa; prioridade final é controlada pelo cliente
+  - Exemplo: Título com "urgente" ou "bloqueado" sugere prioridade alta/crítica
 
 ## 2. Requisitos Não Funcionais
 
@@ -83,7 +88,7 @@ Esses requisitos garantem que a API seja confiável e fácil de manter, mesmo pa
 
 ## 3. Estrutura de Diretórios Revisada
 
-Para organizar o código de forma modular e escalável, adote a seguinte estrutura de pastas. Isso separa responsabilidades: modelos para o banco, esquemas para validação, rotas para endpoints, serviços para lógica de negócio e testes para validação.
+Para organizar o código de forma modular e escalável com as camadas API, Service, Repository e o componente PriorityAdvisor, adote a seguinte estrutura de pastas:
 
 ```
 laboratorio-taskapi/
@@ -93,39 +98,52 @@ laboratorio-taskapi/
 │   ├── database.py          # Configuração do banco de dados (SQLAlchemy engine/session)
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── task.py          # Modelo SQLAlchemy para Task com enum de status
+│   │   └── task.py          # Modelo SQLAlchemy para Task com enum de status e priority
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   └── task.py          # Esquemas Pydantic para validação (TaskCreate, TaskUpdate, etc.)
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   └── task_repository.py # Repository Layer - abstração CRUD via SQLAlchemy
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── task_service.py  # Lógica de negócio (CRUD, filtros, buscas)
+│   │   └── task_service.py  # Service Layer - lógica de negócio, orquestração, integração com PriorityAdvisor
+│   ├── advisors/
+│   │   ├── __init__.py
+│   │   └── priority.py      # PriorityAdvisor - componente de sugestão de prioridade
 │   └── routes/
 │       ├── __init__.py
-│       └── tasks.py         # Endpoints CRUD para tarefas com docstrings
+│       └── tasks.py         # API Layer - endpoints CRUD com docstrings
 ├── alembic/                 # Diretório para migrações do banco
 │   ├── versions/
 │   └── env.py
 ├── tests/
 │   ├── __init__.py
 │   ├── test_tasks.py        # Testes para endpoints
-│   └── test_services.py     # Testes para serviços de negócio
+│   ├── test_services.py     # Testes para serviços de negócio
+│   └── test_priority_advisor.py # Testes para PriorityAdvisor
+├── docs/                    # Documentação do projeto
+│   ├── escopo-mvp.md        # Escopo do MVP com requisitos
+│   ├── backlog.md           # Backlog com releases e tasks
+│   └── diagramas.md         # Diagramas de arquitetura
 ├── requirements.txt         # Dependências Python
 ├── README.md                # Documentação do projeto (como executar, endpoints)
 └── .gitignore               # Ignorar arquivos como __pycache__, *.db
 ```
 
-- **Explicação da Estrutura**:
-  - `app/`: Pasta principal do código, com subpastas para separação clara.
-  - `models/`: Contém classes SQLAlchemy que representam tabelas do banco com Enums.
-  - `schemas/`: Define esquemas Pydantic para entrada/saída de dados, garantindo validação.
-  - `services/`: Camada de lógica de negócio, separada dos endpoints. Contém métodos para CRUD, filtros e buscas.
-  - `routes/`: Agrupa os endpoints FastAPI, facilitando manutenção e documentação.
-  - `alembic/`: Para migrações automáticas do banco.
-  - `tests/`: Para testes unitários (endpoints e serviços).
-  - Arquivos Raiz: `requirements.txt` para dependências; `README.md` para instruções.
+- **Explicação da Estrutura - Camadas de Arquitetura**:
+  - **API Layer** (`routes/`, `schemas/`): Recebe requisições HTTP, valida com Pydantic e coordena com ServiceLayer
+  - **Service Layer** (`services/task_service.py`): Orquestra lógica de negócio, integra com PriorityAdvisor e Repository
+  - **PriorityAdvisor Component** (`advisors/priority.py`): Componente independente que sugere prioridades baseado em regras
+  - **Repository Layer** (`repositories/task_repository.py`): Abstrai operações CRUD, gerencia persistência com SQLAlchemy
+  - **Models** (`models/task.py`): Entidades SQLAlchemy para mapeamento ORM
+  - **Database** (`database.py`): Configuração de engine e session SQLAlchemy
 
-Essa estrutura promove boas práticas em Python/FastAPI, facilitando expansão futura (ex.: adicionar autenticação, mais recursos ou endpoints). A camada de serviços separa a lógica de negócio dos endpoints, tornando o código mais testável e reutilizável.
+Essa arquitetura em camadas promove:
+- **Separação de responsabilidades**: Cada camada tem uma função específica
+- **Testabilidade**: Fácil mockar Repository e PriorityAdvisor para testes unitários
+- **Extensibilidade**: Adicionar novos requisitos sem impactar camadas existentes
+- **Manutenibilidade**: Código organizado e compreensível
 
 ## Instalação e Execução
 
