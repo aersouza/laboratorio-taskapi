@@ -19,18 +19,8 @@ class TaskRepository:
         priority_suggestion: Optional[Priority] = None,
     ) -> TaskOut:
         """Cria uma nova tarefa em memória."""
-        now = datetime.utcnow()
-        task = TaskOut(
-            id=self._next_id,
-            title=payload.title,
-            description=payload.description,
-            status=payload.status,
-            priority=None,
-            priority_suggestion=priority_suggestion,
-            created_at=now,
-            updated_at=now,
-        )
-        self._storage[self._next_id] = task
+        task = self._build_task(payload, priority_suggestion)
+        self._storage[task.id] = task
         self._next_id += 1
         return task
 
@@ -62,19 +52,49 @@ class TaskRepository:
         """Atualiza uma tarefa existente em memória."""
         existing = self.get_by_id(task_id)
         if existing is None:
-            raise KeyError(f"Task {task_id} not found")
+            self._raise_not_found(task_id)
 
-        update_data = payload.model_dump(exclude_none=True)
-        if priority_suggestion is not None:
-            update_data["priority_suggestion"] = priority_suggestion
-
+        update_data = self._build_update_data(payload, priority_suggestion)
         updated_task = existing.model_copy(update=update_data)
-        updated_task = updated_task.model_copy(update={"updated_at": datetime.utcnow()})
+        updated_task = updated_task.model_copy(update={"updated_at": self._now()})
         self._storage[task_id] = updated_task
         return updated_task
 
     def delete(self, task_id: int) -> None:
         """Remove uma tarefa do repositório em memória."""
         if task_id not in self._storage:
-            raise KeyError(f"Task {task_id} not found")
+            self._raise_not_found(task_id)
         del self._storage[task_id]
+
+    def _build_task(
+        self,
+        payload: TaskCreate,
+        priority_suggestion: Optional[Priority],
+    ) -> TaskOut:
+        now = self._now()
+        return TaskOut(
+            id=self._next_id,
+            title=payload.title,
+            description=payload.description,
+            status=payload.status,
+            priority=None,
+            priority_suggestion=priority_suggestion,
+            created_at=now,
+            updated_at=now,
+        )
+
+    def _build_update_data(
+        self,
+        payload: TaskUpdate,
+        priority_suggestion: Optional[Priority],
+    ) -> dict:
+        update_data = payload.model_dump(exclude_none=True)
+        if priority_suggestion is not None:
+            update_data["priority_suggestion"] = priority_suggestion
+        return update_data
+
+    def _now(self) -> datetime:
+        return datetime.utcnow()
+
+    def _raise_not_found(self, task_id: int) -> None:
+        raise KeyError(f"Task {task_id} not found")
