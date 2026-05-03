@@ -1,6 +1,5 @@
 """
 Módulo de modelos da aplicação.
 
-Este pacote contém os modelos SQLAlchemy que representam
-as tabelas do banco de dados.
+Este pacote contém enums e schemas Pydantic usados pela API.
 """

@@ -1,17 +1,10 @@
-"""
-Módulo de modelos SQLAlchemy e schemas Pydantic para tarefas.
-
-Define a entidade Task (SQLAlchemy) e os schemas para validação (Pydantic).
-"""
+"""Enums e schemas Pydantic para tarefas."""
 
 from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum
 from pydantic import BaseModel, Field
-
-from app.database import Base
 
 
 class TaskStatus(str, Enum):
@@ -29,31 +22,6 @@ class Priority(str, Enum):
     MEDIA = "média"
     ALTA = "alta"
     CRITICA = "crítica"
-
-
-class Task(Base):
-    """
-    Modelo SQLAlchemy para representar uma tarefa no banco de dados.
-
-    Atributos:
-        id: Identificador único.
-        title: Título da tarefa (1-100 caracteres).
-        description: Descrição opcional (máx 500 caracteres).
-        status: Status atual (padrão: pendente).
-        priority: Nível de prioridade da tarefa.
-        created_at: Timestamp de criação.
-        updated_at: Timestamp de última atualização.
-    """
-
-    __tablename__ = "tasks"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(100), index=True, nullable=False)
-    description = Column(String(500), nullable=True)
-    status = Column(SQLEnum(TaskStatus), default=TaskStatus.PENDENTE, nullable=False)
-    priority = Column(SQLEnum(Priority), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class TaskCreate(BaseModel):
