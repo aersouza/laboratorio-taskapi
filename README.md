@@ -1,217 +1,307 @@
-# Documento de Requisitos e Estrutura de Diretórios para o MVP "laboratorio-taskapi"
+# Laboratorio TaskAPI
 
-Este documento descreve os requisitos funcionais e não funcionais para o desenvolvimento do MVP "laboratorio-taskapi", uma Micro-API de To-Do List utilizando Python, FastAPI e SQLAlchemy. Como desenvolvedor iniciante em Python, foque em conceitos fundamentais como roteamento, validação de dados e interação com banco de dados. O objetivo é criar uma API simples e funcional que permita gerenciar tarefas (tasks) de forma básica.
+Micro-API de tarefas construída com FastAPI, organizada em camadas e com sugestão de prioridade assistida por IA com fallback local.
 
-## 1. Requisitos Funcionais (CRUD)
+O MVP implementa operações CRUD para tarefas, sugestão automática de prioridade e testes automatizados para serviço, advisor e rotas.
 
-Os requisitos funcionais definem as operações básicas que a API deve suportar para gerenciar tarefas. Cada operação segue o padrão CRUD (Create, Read, Update, Delete) e será implementada como endpoints RESTful.
+## Sumário
 
-- **Criar Tarefa (Create)**:
-  - Endpoint: `POST /tasks`
-  - Descrição: Permite criar uma nova tarefa com título, descrição e status (ex.: "pendente", "em_progresso", "concluída").
-  - Validação: Título obrigatório (mínimo 1 caractere, máximo 100); descrição opcional (máximo 500 caracteres); status padrão é "pendente".
-  - Resposta: Retorna a tarefa criada com ID gerado automaticamente.
+- [Stack](#stack)
+- [Funcionalidades](#funcionalidades)
+- [Arquitetura](#arquitetura)
+- [Instalação](#instalação)
+- [Execução](#execução)
+- [Endpoints](#endpoints)
+- [Prioridade Assistida](#prioridade-assistida)
+- [Testes](#testes)
+- [Limitações](#limitações)
+- [Próximos Passos](#próximos-passos)
 
-- **Listar Tarefas (Read - Listar Todas)**:
-  - Endpoint: `GET /tasks`
-  - Descrição: Retorna uma lista de todas as tarefas armazenadas, incluindo ID, título, descrição e status.
-  - Filtros Opcionais: Suporte a filtros por status (ex.: `?status=pendente`, `?status=concluida`).
-  - Paginação: Suporte a `skip` e `limit` para listar com offset.
-  - Resposta: Lista de tarefas em formato JSON.
+## Stack
 
-- **Obter Tarefa Específica (Read - Por ID)**:
-  - Endpoint: `GET /tasks/{task_id}`
-  - Descrição: Retorna os detalhes de uma tarefa específica pelo ID.
-  - Validação: ID deve existir; caso contrário, retorna erro 404.
-  - Resposta: Detalhes da tarefa em formato JSON.
+- Python
+- FastAPI
+- Pydantic
+- Pytest
+- Uvicorn
 
-- **Atualizar Tarefa (Update)**:
-  - Endpoint: `PUT /tasks/{task_id}`
-  - Descrição: Permite atualizar título, descrição ou status de uma tarefa existente.
-  - Validação: ID deve existir; campos atualizados seguem as mesmas regras de criação.
-  - Resposta: Retorna a tarefa atualizada.
+## Funcionalidades
 
-- **Marcar Tarefa como Concluída (Partial Update)**:
-  - Endpoint: `PATCH /tasks/{task_id}/complete`
-  - Descrição: Marca uma tarefa como concluída atualizando seu status para "concluida".
-  - Validação: ID deve existir; caso contrário, retorna erro 404.
-  - Resposta: Retorna a tarefa com status atualizado.
+- Criar tarefa.
+- Listar tarefas com paginação e filtro por status.
+- Buscar tarefa por ID.
+- Atualizar tarefa.
+- Excluir tarefa.
+- Retornar `404` para IDs inexistentes.
+- Sugerir prioridade com `PriorityAdvisor`.
+- Executar fallback local quando a chamada externa estiver indisponível.
 
-- **Excluir Tarefa (Delete)**:
-  - Endpoint: `DELETE /tasks/{task_id}`
-  - Descrição: Remove uma tarefa pelo ID.
-  - Validação: ID deve existir; caso contrário, retorna erro 404.
-  - Resposta: Confirmação de exclusão (ex.: status 204 No Content).
+## Arquitetura
 
-- **Sugestão de Prioridade (PriorityAdvisor)**:
-  - Análise automática ao criar ou atualizar tarefa
-  - Campo `priority_suggestion` na resposta com valores: `baixa`, `média`, `alta`, `crítica`
-  - Baseado em análise de título, descrição e palavras-chave
-  - Sugestão é informativa; prioridade final é controlada pelo cliente
-  - Exemplo: Título com "urgente" ou "bloqueado" sugere prioridade alta/crítica
-
-## 2. Requisitos Não Funcionais
-
-Os requisitos não funcionais especificam aspectos técnicos e de qualidade que suportam os funcionais, assegurando robustez, segurança e manutenibilidade.
-
-- **Persistência de Dados**:
-  - Utilize SQLite como banco de dados relacional para armazenar tarefas.
-  - Configuração: Arquivo local (ex.: `tasks.db`) para simplicidade no MVP; SQLAlchemy como ORM para abstrair consultas SQL.
-  - Migrações: Use Alembic (integrado ao SQLAlchemy) para gerenciar mudanças no esquema do banco.
-
-- **Validação de Dados**:
-  - Implemente validação usando Pydantic para esquemas de entrada e saída.
-  - Regras: Campos obrigatórios, limites de tamanho, tipos de dados (ex.: string para título, enum para status).
-  - Enumerações: Status deve ser um Enum com valores válidos: "pendente", "em_progresso", "concluida".
-  - Tratamento de Erros: Retorne mensagens claras em caso de validação falhada (ex.: erro 422 Unprocessable Entity).
-
-- **Segurança Básica**:
-  - Autenticação: Não implementada no MVP (simplifique para foco no CRUD), mas prepare estrutura para futuras adições (ex.: JWT).
-  - Validação de Entrada: Proteja contra injeção SQL via SQLAlchemy e sanitização de dados.
-
-- **Performance e Escalabilidade**:
-  - Tempo de Resposta: Mantenha endpoints rápidos (< 500ms) para operações básicas.
-  - Limitação: Não aplicável no MVP, mas considere paginação para listagem de tarefas se o volume crescer.
-
-- **Documentação e Testabilidade**:
-  - Documentação Automática: Use FastAPI para gerar docs interativas via Swagger UI (acessível em `/docs`).
-  - Testes Unitários: Implemente testes para modelos, esquemas, serviços e endpoints usando pytest.
-  - Docstrings: Todos os módulos, classes e funções devem possuir docstrings descritivas.
-  - Logs: Adicione logging simples para depuração (ex.: usando Python's `logging`).
-
-- **Compatibilidade e Ambiente**:
-  - Python Versão: 3.8+ para compatibilidade com FastAPI e SQLAlchemy.
-  - Dependências: Liste em `requirements.txt` (ex.: `fastapi`, `uvicorn`, `sqlalchemy`, `alembic`).
-  - Ambiente: Suporte a execução local via virtualenv; prepare para deploy simples (ex.: via Uvicorn).
-
-Esses requisitos garantem que a API seja confiável e fácil de manter, mesmo para iniciantes.
-
-## 3. Estrutura de Diretórios Revisada
-
-Para organizar o código de forma modular e escalável com as camadas API, Service, Repository e o componente PriorityAdvisor, adote a seguinte estrutura de pastas:
-
-```
+```text
 laboratorio-taskapi/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py              # Ponto de entrada da aplicação FastAPI
-│   ├── database.py          # Configuração do banco de dados (SQLAlchemy engine/session)
+│   ├── api/
+│   │   └── task_routes.py
 │   ├── models/
-│   │   ├── __init__.py
-│   │   └── task.py          # Modelo SQLAlchemy para Task com enum de status e priority
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   └── task.py          # Esquemas Pydantic para validação (TaskCreate, TaskUpdate, etc.)
+│   │   └── task.py
 │   ├── repositories/
-│   │   ├── __init__.py
-│   │   └── task_repository.py # Repository Layer - abstração CRUD via SQLAlchemy
+│   │   └── task_repository.py
 │   ├── services/
-│   │   ├── __init__.py
-│   │   └── task_service.py  # Service Layer - lógica de negócio, orquestração, integração com PriorityAdvisor
-│   ├── advisors/
-│   │   ├── __init__.py
-│   │   └── priority.py      # PriorityAdvisor - componente de sugestão de prioridade
-│   └── routes/
-│       ├── __init__.py
-│       └── tasks.py         # API Layer - endpoints CRUD com docstrings
-├── alembic/                 # Diretório para migrações do banco
-│   ├── versions/
-│   └── env.py
+│   │   ├── priority_advisor.py
+│   │   └── task_service.py
+│   └── main.py
 ├── tests/
-│   ├── __init__.py
-│   ├── test_tasks.py        # Testes para endpoints
-│   ├── test_services.py     # Testes para serviços de negócio
-│   └── test_priority_advisor.py # Testes para PriorityAdvisor
-├── docs/                    # Documentação do projeto
-│   ├── escopo-mvp.md        # Escopo do MVP com requisitos
-│   ├── backlog.md           # Backlog com releases e tasks
-│   └── diagramas.md         # Diagramas de arquitetura
-├── requirements.txt         # Dependências Python
-├── README.md                # Documentação do projeto (como executar, endpoints)
-└── .gitignore               # Ignorar arquivos como __pycache__, *.db
+│   ├── test_priority_advisor.py
+│   ├── test_task_routes.py
+│   └── test_task_service.py
+├── requirements.txt
+└── README.md
 ```
 
-- **Explicação da Estrutura - Camadas de Arquitetura**:
-  - **API Layer** (`routes/`, `schemas/`): Recebe requisições HTTP, valida com Pydantic e coordena com ServiceLayer
-  - **Service Layer** (`services/task_service.py`): Orquestra lógica de negócio, integra com PriorityAdvisor e Repository
-  - **PriorityAdvisor Component** (`advisors/priority.py`): Componente independente que sugere prioridades baseado em regras
-  - **Repository Layer** (`repositories/task_repository.py`): Abstrai operações CRUD, gerencia persistência com SQLAlchemy
-  - **Models** (`models/task.py`): Entidades SQLAlchemy para mapeamento ORM
-  - **Database** (`database.py`): Configuração de engine e session SQLAlchemy
+### Camadas
 
-Essa arquitetura em camadas promove:
-- **Separação de responsabilidades**: Cada camada tem uma função específica
-- **Testabilidade**: Fácil mockar Repository e PriorityAdvisor para testes unitários
-- **Extensibilidade**: Adicionar novos requisitos sem impactar camadas existentes
-- **Manutenibilidade**: Código organizado e compreensível
+| Camada | Arquivo | Responsabilidade |
+| --- | --- | --- |
+| API | `app/api/task_routes.py` | Endpoints HTTP, status codes e tratamento de `404`. |
+| Service | `app/services/task_service.py` | Orquestra regras de negócio e integra repositório com advisor. |
+| Advisor | `app/services/priority_advisor.py` | Sugere prioridade por LLM opcional ou heurística local. |
+| Repository | `app/repositories/task_repository.py` | Persistência em memória e operações CRUD. |
+| Models | `app/models/task.py` | Enums e schemas Pydantic usados pela implementação atual. |
 
-## Instalação e Execução
+## Instalação
 
-### Instalação
+Clone o repositório e acesse o diretório do projeto:
 
-1. Clone o repositório.
-2. Crie um ambiente virtual: `python -m venv venv`
-3. Ative o ambiente: `venv\Scripts\activate` (Windows) ou `source venv/bin/activate` (Linux/Mac)
-4. Instale as dependências: `pip install -r requirements.txt`
-
-### Execução
-
-Execute o servidor: `uvicorn app.main:app --reload`
-
-Acesse a documentação em: http://127.0.0.1:8000/docs
-
-### Endpoints
-
-#### Criar Tarefa
-- **Método**: `POST /tasks`
-- **Body**: `{"title": "Minha tarefa", "description": "Descrição", "status": "pendente"}`
-- **Resposta**: Tarefa criada com ID
-
-#### Listar Tarefas
-- **Método**: `GET /tasks`
-- **Parâmetros**: `?status=pendente&skip=0&limit=10`
-- **Resposta**: Lista de tarefas
-
-#### Obter Tarefa Específica
-- **Método**: `GET /tasks/{id}`
-- **Resposta**: Detalhes da tarefa
-
-#### Atualizar Tarefa
-- **Método**: `PUT /tasks/{id}`
-- **Body**: `{"title": "Novo título", "description": "Nova descrição", "status": "em_progresso"}`
-- **Resposta**: Tarefa atualizada
-
-#### Marcar Tarefa como Concluída
-- **Método**: `PATCH /tasks/{id}/complete`
-- **Resposta**: Tarefa com status "concluida"
-
-#### Excluir Tarefa
-- **Método**: `DELETE /tasks/{id}`
-- **Resposta**: Status 204 No Content
-
-### Testes
-
-Execute os testes:
 ```bash
-pytest
+git clone https://github.com/aersouza/laboratorio-taskapi.git
+cd laboratorio-taskapi
 ```
 
-Execute testes com cobertura:
+Crie e ative um ambiente virtual:
+
 ```bash
-pytest --cov=app
+python -m venv venv
 ```
 
-### Status das Tarefas
+Windows:
 
-As tarefas suportam os seguintes status:
-- `pendente`: Tarefa aguardando execução (padrão)
-- `em_progresso`: Tarefa em execução
-- `concluida`: Tarefa concluída
-- `GET /tasks`: Listar tarefas
-- `GET /tasks/{id}`: Obter tarefa por ID
-- `PUT /tasks/{id}`: Atualizar tarefa
-- `DELETE /tasks/{id}`: Excluir tarefa
+```bash
+.\venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+source venv/bin/activate
+```
+
+Instale as dependências:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Execução
+
+Execute a aplicação com Uvicorn:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+A documentação interativa fica disponível em:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Healthcheck:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## Endpoints
+
+### Criar Tarefa
+
+```http
+POST /tasks/
+```
+
+Body:
+
+```json
+{
+  "title": "Corrigir bug crítico",
+  "description": "Erro bloqueia o fluxo principal",
+  "status": "pendente"
+}
+```
+
+Status esperado:
+
+```text
+201 Created
+```
+
+### Listar Tarefas
+
+```http
+GET /tasks/?status=pendente&skip=0&limit=100
+```
+
+Status esperado:
+
+```text
+200 OK
+```
+
+### Buscar Tarefa por ID
+
+```http
+GET /tasks/{task_id}
+```
+
+Status esperados:
+
+```text
+200 OK
+404 Not Found
+```
+
+### Atualizar Tarefa
+
+```http
+PUT /tasks/{task_id}
+```
+
+Body:
+
+```json
+{
+  "title": "Corrigir bug crítico atualizado",
+  "description": "Fluxo principal impactado",
+  "status": "em_progresso",
+  "priority": "alta"
+}
+```
+
+Status esperados:
+
+```text
+200 OK
+404 Not Found
+```
+
+### Excluir Tarefa
+
+```http
+DELETE /tasks/{task_id}
+```
+
+Status esperados:
+
+```text
+204 No Content
+404 Not Found
+```
+
+## Modelo de Dados
+
+### Status
+
+| Valor | Descrição |
+| --- | --- |
+| `pendente` | Tarefa aguardando execução. |
+| `em_progresso` | Tarefa em andamento. |
+| `concluida` | Tarefa concluída. |
+
+### Prioridade
+
+| Valor | Descrição |
+| --- | --- |
+| `baixa` | Baixa prioridade. |
+| `média` | Prioridade intermediária. |
+| `alta` | Alta prioridade. |
+| `crítica` | Prioridade crítica. |
+
+### Exemplo de Resposta
+
+```json
+{
+  "id": 1,
+  "title": "Corrigir bug crítico",
+  "description": "Erro bloqueia o fluxo principal",
+  "status": "pendente",
+  "priority": null,
+  "priority_suggestion": "crítica",
+  "created_at": "2026-05-03T19:00:00.000000",
+  "updated_at": "2026-05-03T19:00:00.000000"
+}
+```
+
+## Prioridade Assistida
+
+O `PriorityAdvisor` sugere prioridade com duas estratégias:
+
+1. Chamada externa opcional via biblioteca `openai`, quando `OPENAI_API_KEY` estiver configurada.
+2. Heurística local como comportamento padrão ou fallback.
+
+Variáveis de ambiente suportadas:
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | vazio | Habilita chamada externa quando presente. |
+| `OPENAI_MODEL` | `gpt-3.5-turbo` | Modelo usado na chamada externa. |
+| `PRIORITY_ADVISOR_TIMEOUT` | `3` | Timeout da chamada externa em segundos. |
+
+Heurística local:
+
+| Prioridade | Palavras-chave |
+| --- | --- |
+| `crítica` | `urgente`, `agora`, `imediato`, `crítico`, `crítica`, `bloqueio` |
+| `alta` | `atraso`, `importante`, `alta prioridade`, `alta` |
+| `média` | `melhoria`, `refator`, `refatoração`, `documentação`, `ajuste`, `revisão` |
+| `baixa` | Padrão quando nenhuma regra anterior é acionada. |
 
 ## Testes
 
-Execute os testes: `pytest`
+Execute todas as suítes atuais:
+
+```bash
+pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py
+```
+
+Execute com cobertura:
+
+```bash
+pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py --cov=app
+```
+
+Suítes disponíveis:
+
+| Arquivo | Cobertura |
+| --- | --- |
+| `tests/test_task_service.py` | CRUD do `TaskService` e casos de ID inexistente. |
+| `tests/test_priority_advisor.py` | Heurística local, parse de prioridade e fallback. |
+| `tests/test_task_routes.py` | Status HTTP `201`, `200`, `204` e `404` com `TestClient`. |
+
+## Limitações
+
+- O repositório atual é em memória; os dados são perdidos ao reiniciar a aplicação.
+- Não há autenticação ou autorização.
+- Não há controle de concorrência para o repositório em memória.
+- A integração externa do `PriorityAdvisor` depende da biblioteca `openai` estar instalada e configurada.
+- O modelo externo configurado por padrão é legado e deve ser revisado antes de uso produtivo.
+- Os warnings de depreciação atuais indicam pontos futuros de manutenção em `datetime.utcnow()` e dependências FastAPI/Starlette/httpx.
+
+## Próximos Passos
+
+- Atualizar `PriorityAdvisor` para o cliente moderno da OpenAI.
+- Trocar `datetime.utcnow()` por datetimes timezone-aware.
+- Adicionar autenticação com JWT ou API key.
+- Adicionar logs estruturados e middleware de correlação.
+- Criar configuração por ambiente com `.env`.
+- Adicionar pipeline de CI para testes e cobertura.
