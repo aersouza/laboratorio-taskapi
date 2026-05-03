@@ -6,8 +6,11 @@ de healthcheck para verificar o estado da API.
 """
 
 from datetime import datetime, timezone
+
 from fastapi import FastAPI
 from pydantic import BaseModel
+
+from app.api.task_routes import router as task_router
 
 
 class HealthCheckResponse(BaseModel):
@@ -24,6 +27,8 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+app.include_router(task_router)
 
 
 @app.get("/health", response_model=HealthCheckResponse, tags=["health"])
