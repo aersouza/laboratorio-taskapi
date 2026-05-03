@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from app.models.task import TaskCreate, TaskOut, TaskStatus, TaskUpdate
+from app.models.task import Priority, TaskCreate, TaskOut, TaskStatus, TaskUpdate
 from app.repositories.task_repository import TaskRepository
 from app.services.priority_advisor import PriorityAdvisor
 
@@ -16,11 +16,14 @@ class TaskService:
 
     def create_task(self, payload: TaskCreate) -> TaskOut:
         """Cria uma tarefa com sugestão de prioridade."""
-        suggestion = self._advisor.analyze_task(
+        priority_suggestion = self._suggest_priority(
             title=payload.title,
             description=payload.description,
         )
-        return self._repository.create(payload, priority_suggestion=suggestion)
+        return self._repository.create(
+            payload,
+            priority_suggestion=priority_suggestion,
+        )
 
     def list_tasks(
         self,
@@ -43,17 +46,11 @@ class TaskService:
 
         priority_suggestion = None
         if payload.title is not None or payload.description is not None:
-            title = payload.title if payload.title is not None else existing.title
-            description = (
-                payload.description
-                if payload.description is not None
-                else existing.description
-            )
-            suggestion = self._advisor.analyze_task(
+            title, description = self._merge_task_text(existing, payload)
+            priority_suggestion = self._suggest_priority(
                 title=title,
                 description=description,
             )
-            priority_suggestion = suggestion
 
         return self._repository.update(
             task_id,
@@ -76,3 +73,26 @@ class TaskService:
             return self._repository.update(task_id, payload)
         except KeyError:
             return None
+
+    def _suggest_priority(
+        self,
+        title: str,
+        description: Optional[str] = None,
+    ) -> Priority:
+        return self._advisor.analyze_task(
+            title=title,
+            description=description,
+        )
+
+    def _merge_task_text(
+        self,
+        existing: TaskOut,
+        payload: TaskUpdate,
+    ) -> tuple[str, Optional[str]]:
+        title = payload.title if payload.title is not None else existing.title
+        description = (
+            payload.description
+            if payload.description is not None
+            else existing.description
+        )
+        return title, description
