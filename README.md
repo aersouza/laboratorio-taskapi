@@ -8,14 +8,15 @@ Os requisitos funcionais definem as operações básicas que a API deve suportar
 
 - **Criar Tarefa (Create)**:
   - Endpoint: `POST /tasks`
-  - Descrição: Permite criar uma nova tarefa com título, descrição e status (ex.: "pendente", "concluída").
-  - Validação: Título obrigatório (mínimo 1 caractere, máximo 100); descrição opcional (máximo 500 caracteres); status deve ser um valor pré-definido.
+  - Descrição: Permite criar uma nova tarefa com título, descrição e status (ex.: "pendente", "em_progresso", "concluída").
+  - Validação: Título obrigatório (mínimo 1 caractere, máximo 100); descrição opcional (máximo 500 caracteres); status padrão é "pendente".
   - Resposta: Retorna a tarefa criada com ID gerado automaticamente.
 
 - **Listar Tarefas (Read - Listar Todas)**:
   - Endpoint: `GET /tasks`
   - Descrição: Retorna uma lista de todas as tarefas armazenadas, incluindo ID, título, descrição e status.
-  - Filtros Opcionais: Suporte a filtros por status (ex.: `?status=pendente`).
+  - Filtros Opcionais: Suporte a filtros por status (ex.: `?status=pendente`, `?status=concluida`).
+  - Paginação: Suporte a `skip` e `limit` para listar com offset.
   - Resposta: Lista de tarefas em formato JSON.
 
 - **Obter Tarefa Específica (Read - Por ID)**:
@@ -29,6 +30,12 @@ Os requisitos funcionais definem as operações básicas que a API deve suportar
   - Descrição: Permite atualizar título, descrição ou status de uma tarefa existente.
   - Validação: ID deve existir; campos atualizados seguem as mesmas regras de criação.
   - Resposta: Retorna a tarefa atualizada.
+
+- **Marcar Tarefa como Concluída (Partial Update)**:
+  - Endpoint: `PATCH /tasks/{task_id}/complete`
+  - Descrição: Marca uma tarefa como concluída atualizando seu status para "concluida".
+  - Validação: ID deve existir; caso contrário, retorna erro 404.
+  - Resposta: Retorna a tarefa com status atualizado.
 
 - **Excluir Tarefa (Delete)**:
   - Endpoint: `DELETE /tasks/{task_id}`
@@ -50,6 +57,7 @@ Os requisitos não funcionais especificam aspectos técnicos e de qualidade que 
 - **Validação de Dados**:
   - Implemente validação usando Pydantic para esquemas de entrada e saída.
   - Regras: Campos obrigatórios, limites de tamanho, tipos de dados (ex.: string para título, enum para status).
+  - Enumerações: Status deve ser um Enum com valores válidos: "pendente", "em_progresso", "concluida".
   - Tratamento de Erros: Retorne mensagens claras em caso de validação falhada (ex.: erro 422 Unprocessable Entity).
 
 - **Segurança Básica**:
@@ -62,7 +70,8 @@ Os requisitos não funcionais especificam aspectos técnicos e de qualidade que 
 
 - **Documentação e Testabilidade**:
   - Documentação Automática: Use FastAPI para gerar docs interativas via Swagger UI (acessível em `/docs`).
-  - Testes: Implemente testes unitários básicos com pytest para modelos e endpoints.
+  - Testes Unitários: Implemente testes para modelos, esquemas, serviços e endpoints usando pytest.
+  - Docstrings: Todos os módulos, classes e funções devem possuir docstrings descritivas.
   - Logs: Adicione logging simples para depuração (ex.: usando Python's `logging`).
 
 - **Compatibilidade e Ambiente**:
@@ -72,9 +81,9 @@ Os requisitos não funcionais especificam aspectos técnicos e de qualidade que 
 
 Esses requisitos garantem que a API seja confiável e fácil de manter, mesmo para iniciantes.
 
-## 3. Estrutura de Diretórios Sugerida
+## 3. Estrutura de Diretórios Revisada
 
-Para organizar o código de forma modular e escalável, adote a seguinte estrutura de pastas. Isso separa responsabilidades: modelos para o banco, esquemas para validação, rotas para endpoints e configuração para setup.
+Para organizar o código de forma modular e escalável, adote a seguinte estrutura de pastas. Isso separa responsabilidades: modelos para o banco, esquemas para validação, rotas para endpoints, serviços para lógica de negócio e testes para validação.
 
 ```
 laboratorio-taskapi/
@@ -84,19 +93,23 @@ laboratorio-taskapi/
 │   ├── database.py          # Configuração do banco de dados (SQLAlchemy engine/session)
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── task.py          # Modelo SQLAlchemy para Task
+│   │   └── task.py          # Modelo SQLAlchemy para Task com enum de status
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   └── task.py          # Esquemas Pydantic para validação (TaskCreate, TaskUpdate, etc.)
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── task_service.py  # Lógica de negócio (CRUD, filtros, buscas)
 │   └── routes/
 │       ├── __init__.py
-│       └── tasks.py         # Endpoints CRUD para tarefas
-├── alembic/                 # Diretório para migrações do banco (gerado por Alembic)
+│       └── tasks.py         # Endpoints CRUD para tarefas com docstrings
+├── alembic/                 # Diretório para migrações do banco
 │   ├── versions/
 │   └── env.py
 ├── tests/
 │   ├── __init__.py
-│   └── test_tasks.py        # Testes para endpoints e modelos
+│   ├── test_tasks.py        # Testes para endpoints
+│   └── test_services.py     # Testes para serviços de negócio
 ├── requirements.txt         # Dependências Python
 ├── README.md                # Documentação do projeto (como executar, endpoints)
 └── .gitignore               # Ignorar arquivos como __pycache__, *.db
@@ -104,14 +117,15 @@ laboratorio-taskapi/
 
 - **Explicação da Estrutura**:
   - `app/`: Pasta principal do código, com subpastas para separação clara.
-  - `models/`: Contém classes SQLAlchemy que representam tabelas do banco.
+  - `models/`: Contém classes SQLAlchemy que representam tabelas do banco com Enums.
   - `schemas/`: Define esquemas Pydantic para entrada/saída de dados, garantindo validação.
-  - `routes/`: Agrupa os endpoints FastAPI, facilitando manutenção.
+  - `services/`: Camada de lógica de negócio, separada dos endpoints. Contém métodos para CRUD, filtros e buscas.
+  - `routes/`: Agrupa os endpoints FastAPI, facilitando manutenção e documentação.
   - `alembic/`: Para migrações automáticas do banco.
-  - `tests/`: Para testes, essenciais para validar o CRUD.
+  - `tests/`: Para testes unitários (endpoints e serviços).
   - Arquivos Raiz: `requirements.txt` para dependências; `README.md` para instruções.
 
-Essa estrutura promove boas práticas em Python/FastAPI, facilitando expansão futura (ex.: adicionar autenticação ou mais recursos). Comece criando os arquivos passo a passo, testando cada endpoint incrementalmente. Se precisar de código de exemplo para implementação, consulte a documentação oficial do FastAPI e SQLAlchemy. Boa sorte no desenvolvimento!
+Essa estrutura promove boas práticas em Python/FastAPI, facilitando expansão futura (ex.: adicionar autenticação, mais recursos ou endpoints). A camada de serviços separa a lógica de negócio dos endpoints, tornando o código mais testável e reutilizável.
 
 ## Instalação e Execução
 
@@ -119,7 +133,7 @@ Essa estrutura promove boas práticas em Python/FastAPI, facilitando expansão f
 
 1. Clone o repositório.
 2. Crie um ambiente virtual: `python -m venv venv`
-3. Ative o ambiente: `venv\Scripts\activate` (Windows)
+3. Ative o ambiente: `venv\Scripts\activate` (Windows) ou `source venv/bin/activate` (Linux/Mac)
 4. Instale as dependências: `pip install -r requirements.txt`
 
 ### Execução
@@ -130,15 +144,51 @@ Acesse a documentação em: http://127.0.0.1:8000/docs
 
 ### Endpoints
 
-- `POST /tasks`: Criar tarefa
-- `GET /tasks`: Listar tarefas
-- `GET /tasks/{id}`: Obter tarefa por ID
-- `PUT /tasks/{id}`: Atualizar tarefa
-- `DELETE /tasks/{id}`: Excluir tarefa
+#### Criar Tarefa
+- **Método**: `POST /tasks`
+- **Body**: `{"title": "Minha tarefa", "description": "Descrição", "status": "pendente"}`
+- **Resposta**: Tarefa criada com ID
+
+#### Listar Tarefas
+- **Método**: `GET /tasks`
+- **Parâmetros**: `?status=pendente&skip=0&limit=10`
+- **Resposta**: Lista de tarefas
+
+#### Obter Tarefa Específica
+- **Método**: `GET /tasks/{id}`
+- **Resposta**: Detalhes da tarefa
+
+#### Atualizar Tarefa
+- **Método**: `PUT /tasks/{id}`
+- **Body**: `{"title": "Novo título", "description": "Nova descrição", "status": "em_progresso"}`
+- **Resposta**: Tarefa atualizada
+
+#### Marcar Tarefa como Concluída
+- **Método**: `PATCH /tasks/{id}/complete`
+- **Resposta**: Tarefa com status "concluida"
+
+#### Excluir Tarefa
+- **Método**: `DELETE /tasks/{id}`
+- **Resposta**: Status 204 No Content
 
 ### Testes
 
-Execute os testes: `pytest`
+Execute os testes:
+```bash
+pytest
+```
+
+Execute testes com cobertura:
+```bash
+pytest --cov=app
+```
+
+### Status das Tarefas
+
+As tarefas suportam os seguintes status:
+- `pendente`: Tarefa aguardando execução (padrão)
+- `em_progresso`: Tarefa em execução
+- `concluida`: Tarefa concluída
 - `GET /tasks`: Listar tarefas
 - `GET /tasks/{id}`: Obter tarefa por ID
 - `PUT /tasks/{id}`: Atualizar tarefa
