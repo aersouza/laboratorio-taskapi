@@ -1,132 +1,117 @@
 # Diagramas de Arquitetura — laboratorio-taskapi
 
-Este documento contém diagramas Mermaid representando a arquitetura do sistema FastAPI com camadas API, Service, Repository e o componente de Priorização (PriorityAdvisor).
+Este documento contém diagramas Mermaid da arquitetura atual do MVP: uma API FastAPI de tarefas com repositório em memória e sugestão de prioridade via `PriorityAdvisor`.
 
-## Diagrama de Fluxo de Dados (Requisição HTTP)
+## Fluxo de Dados
 
-O diagrama abaixo ilustra o caminho de uma requisição HTTP desde o cliente até o banco de dados SQLite, passando pelas camadas da aplicação.
+O diagrama abaixo mostra o caminho de uma requisição HTTP desde o cliente até o repositório em memória.
 
 ```mermaid
 graph TD
-    A[Cliente HTTP] -->|Request JSON| B[FastAPI Routes]
-    B -->|Validação| C[Pydantic Schemas]
-    C -->|Dados Validados| D[TaskService]
-    D -->|Consulta Prioridade| E[PriorityAdvisor]
-    E -->|Sugestão Prioridade| D
-    D -->|CRUD Operations| F[Repository Layer]
-    F -->|SQL Queries| G[SQLAlchemy Models]
-    G -->|Read/Write| H[SQLite Database]
-    H -->|Resultado| G
-    G -->|Objetos Task| F
-    F -->|Task Objects| D
-    D -->|Task Objects| C
-    C -->|Response JSON| B
-    B -->|Response JSON| A
+    A[Cliente HTTP] -->|Request JSON| B[FastAPI App<br/>app/main.py]
+    B -->|Roteamento| C[Task Router<br/>app/api/task_routes.py]
+    C -->|Validação e serialização| D[Schemas Pydantic<br/>app/models/task.py]
+    C -->|Payload validado| E[TaskService<br/>app/services/task_service.py]
+    E -->|title + description| F[PriorityAdvisor<br/>app/services/priority_advisor.py]
+    F -->|priority_suggestion| E
+    E -->|CRUD| G[TaskRepository<br/>app/repositories/task_repository.py]
+    G -->|Read/Write| H[(Memória do processo)]
+    H -->|TaskOut| G
+    G -->|TaskOut| E
+    E -->|TaskOut| C
+    C -->|Response JSON| A
 
     style A fill:#e1f5fe
     style B fill:#b3e5fc
     style C fill:#81d4fa
     style D fill:#4fc3f7
-    style E fill:#ff6f00
-    style F fill:#29b6f6
-    style G fill:#1e88e5
-    style H fill:#0d47a1
+    style E fill:#29b6f6
+    style F fill:#ff9800
+    style G fill:#0288d1
+    style H fill:#01579b,color:#ffffff
 ```
 
-### Fluxo de Persistência
+### Etapas
 
-1. **Request:** Cliente envia requisição HTTP com JSON
-2. **Validação:** FastAPI Routes recebe e passa aos Schemas Pydantic para validação
-3. **Processamento:** TaskService coordena lógica de negócio e consulta PriorityAdvisor
-4. **Priorização:** PriorityAdvisor retorna sugestão de prioridade baseada em regras
-5. **Persistência:** Repository Layer executa operações CRUD via SQLAlchemy Models
-6. **Banco de Dados:** SQLite persiste dados
-7. **Resposta:** Dados retornam através das camadas em formato JSON validado
+1. O cliente envia uma requisição HTTP para a API.
+2. `app/main.py` recebe a requisição e encaminha para o router registrado.
+3. `app/api/task_routes.py` valida entrada e saída usando schemas Pydantic.
+4. `TaskService` orquestra a regra de negócio.
+5. `PriorityAdvisor` sugere prioridade ao criar tarefa ou ao atualizar título/descrição.
+6. `TaskRepository` grava, consulta, atualiza ou remove tarefas em memória.
+7. A resposta retorna ao cliente como JSON.
 
 ## Diagrama de Componentes
-
-O diagrama de componentes mostra as camadas arquiteturais: Cliente, API Layer, Service Layer, PriorityAdvisor e Repository Layer.
 
 ```mermaid
 graph TB
     subgraph "Cliente"
-        CLI["HTTP Client<br/>(curl, Postman, etc)"]
+        CLI["HTTP Client<br/>(curl, Postman, TestClient)"]
     end
 
-    subgraph "API Layer"
-        R["routes/tasks.py<br/>(FastAPI Endpoints)"]
-        S["schemas/task.py<br/>(Pydantic Models)"]
+    subgraph "FastAPI Application"
+        APP["main.py<br/>(FastAPI app)"]
+        ROUTER["api/task_routes.py<br/>(Task endpoints)"]
+    end
+
+    subgraph "Domain Models"
+        MODELS["models/task.py<br/>(Enums + Pydantic schemas)"]
     end
 
     subgraph "Service Layer"
         SVC["services/task_service.py<br/>(TaskService)"]
-    end
-
-    subgraph "PriorityAdvisor Component"
-        PA["advisors/priority.py<br/>(PriorityAdvisor)"]
+        PA["services/priority_advisor.py<br/>(PriorityAdvisor)"]
     end
 
     subgraph "Repository Layer"
         REPO["repositories/task_repository.py<br/>(TaskRepository)"]
-        M["models/task.py<br/>(SQLAlchemy Models)"]
+        STORE[("In-memory storage<br/>dict[int, TaskOut]")]
     end
 
-    subgraph "Persistence"
-        DB["database.py<br/>(Engine/Session)"]
-        DATA["SQLite Database<br/>(tasks.db)"]
-    end
-
-    CLI -->|HTTP Request| R
-    R -->|Validação| S
-    R -->|Coordenação| SVC
-    SVC -->|Consulta| PA
-    PA -->|Sugestão| SVC
-    SVC -->|CRUD| REPO
-    REPO -->|Query| M
-    M -->|Session| DB
-    DB -->|Connect| DATA
-    DATA -->|Result| DB
-    DB -->|Session| M
-    M -->|Objects| REPO
-    REPO -->|Entities| SVC
-    SVC -->|Data| S
-    S -->|Response| R
-    R -->|HTTP Response| CLI
+    CLI -->|HTTP Request| APP
+    APP -->|include_router| ROUTER
+    ROUTER -->|Validates request/response| MODELS
+    ROUTER -->|Calls service| SVC
+    SVC -->|Suggest priority| PA
+    PA -->|Priority| SVC
+    SVC -->|CRUD operations| REPO
+    REPO -->|Read/Write| STORE
+    STORE -->|TaskOut| REPO
+    REPO -->|TaskOut/list[TaskOut]| SVC
+    SVC -->|Result| ROUTER
+    ROUTER -->|HTTP Response| APP
+    APP -->|JSON Response| CLI
 
     style CLI fill:#e1f5fe
-    style R fill:#b3e5fc
-    style S fill:#81d4fa
-    style SVC fill:#4fc3f7
-    style PA fill:#ff6f00
-    style REPO fill:#29b6f6
-    style M fill:#1e88e5
-    style DB fill:#0d47a1
-    style DATA fill:#01579b
+    style APP fill:#b3e5fc
+    style ROUTER fill:#81d4fa
+    style MODELS fill:#4fc3f7
+    style SVC fill:#29b6f6
+    style PA fill:#ff9800
+    style REPO fill:#0288d1
+    style STORE fill:#01579b,color:#ffffff
 ```
 
-### Responsabilidades de Cada Camada
+### Responsabilidades
 
-- **API Layer** (`routes/`, `schemas/`): Recebe requisições HTTP, valida com Pydantic e coordena com serviços
-- **Service Layer** (`services/task_service.py`): Orquestra lógica de negócio, filtros, paginação e consulta PriorityAdvisor
-- **PriorityAdvisor** (`advisors/priority.py`): Componente de priorização que sugere prioridades baseado em regras de negócio
-- **Repository Layer** (`repositories/task_repository.py`): Abstrai operações CRUD e gerencia persistência
-- **Models** (`models/task.py`): Entidades SQLAlchemy para mapeamento ORM
-- **Database** (`database.py`): Configuração de engine e session SQLAlchemy
+- **FastAPI App** (`app/main.py`): cria a aplicação, registra routers e expõe o healthcheck.
+- **API Layer** (`app/api/task_routes.py`): implementa endpoints HTTP, status codes e tratamento de `404`.
+- **Models** (`app/models/task.py`): define `TaskStatus`, `Priority`, `TaskCreate`, `TaskUpdate` e `TaskOut`.
+- **Service Layer** (`app/services/task_service.py`): concentra a regra de negócio e coordena advisor/repositório.
+- **PriorityAdvisor** (`app/services/priority_advisor.py`): sugere prioridade via LLM opcional ou heurística local.
+- **Repository Layer** (`app/repositories/task_repository.py`): mantém tarefas em memória durante o ciclo de vida do processo.
 
 ## Diagrama de Endpoints
-
-O diagrama abaixo mostra os endpoints CRUD implementados no MVP com suporte a PriorityAdvisor.
 
 ```mermaid
 graph LR
     subgraph "Task API Endpoints"
-        POST["POST /tasks<br/>(Create com Prioridade)"]
-        GET["GET /tasks<br/>(List com Filtros)"]
-        GETID["GET /tasks/{id}<br/>(Read)"]
-        PUT["PUT /tasks/{id}<br/>(Update)"]
-        PATCH["PATCH /tasks/{id}/complete<br/>(Complete)"]
-        DELETE["DELETE /tasks/{id}<br/>(Delete)"]
-        HEALTH["GET /health<br/>(Healthcheck)"]
+        POST["POST /tasks/<br/>Create"]
+        GET["GET /tasks/<br/>List"]
+        GETID["GET /tasks/{task_id}<br/>Read"]
+        PUT["PUT /tasks/{task_id}<br/>Update"]
+        DELETE["DELETE /tasks/{task_id}<br/>Delete"]
+        HEALTH["GET /health<br/>Healthcheck"]
     end
 
     subgraph "HTTP Status"
@@ -141,28 +126,59 @@ graph LR
     GET -.->|Success| S200
     GETID -.->|Success| S200
     PUT -.->|Success| S200
-    PATCH -.->|Success| S200
     DELETE -.->|Success| S204
     HEALTH -.->|Success| S200
-    
-    POST -.->|Error| S422
-    GETID -.->|Error| S404
-    PUT -.->|Error| S404
-    PATCH -.->|Error| S404
-    DELETE -.->|Error| S404
+
+    POST -.->|Invalid payload| S422
+    PUT -.->|Invalid payload| S422
+    GETID -.->|Missing task| S404
+    PUT -.->|Missing task| S404
+    DELETE -.->|Missing task| S404
 
     style POST fill:#ff9800
     style GET fill:#a5d6a7
     style GETID fill:#81c784
     style PUT fill:#66bb6a
-    style PATCH fill:#558b2f
     style DELETE fill:#f57c00
-    style HEALTH fill:#0288d1
+    style HEALTH fill:#0288d1,color:#ffffff
 ```
 
-### Integração com PriorityAdvisor
+## Fluxo do PriorityAdvisor
 
-O endpoint `POST /tasks` é enriquecido pelo **PriorityAdvisor**, que:
-- Analisa título, descrição e contexto da tarefa
-- Retorna sugestão de prioridade (baixa, média, alta, crítica)
-- A prioridade sugerida é retornada na resposta para o cliente validar
+```mermaid
+sequenceDiagram
+    participant Client as Cliente HTTP
+    participant Router as task_routes.py
+    participant Service as TaskService
+    participant Advisor as PriorityAdvisor
+    participant Repo as TaskRepository
+
+    Client->>Router: POST /tasks/
+    Router->>Service: create_task(TaskCreate)
+    Service->>Advisor: analyze_task(title, description)
+    alt OPENAI_API_KEY configurada e chamada externa disponível
+        Advisor-->>Service: prioridade sugerida por LLM
+    else Sem chave, biblioteca ausente, erro ou timeout
+        Advisor-->>Service: prioridade sugerida por heurística local
+    end
+    Service->>Repo: create(payload, priority_suggestion)
+    Repo-->>Service: TaskOut
+    Service-->>Router: TaskOut
+    Router-->>Client: 201 Created
+```
+
+### Regras de Heurística Local
+
+| Prioridade | Palavras-chave |
+| --- | --- |
+| `crítica` | `urgente`, `agora`, `imediato`, `crítico`, `crítica`, `bloqueio` |
+| `alta` | `atraso`, `importante`, `alta prioridade`, `alta` |
+| `média` | `melhoria`, `refator`, `refatoração`, `documentação`, `ajuste`, `revisão` |
+| `baixa` | Padrão quando nenhuma palavra-chave é encontrada. |
+
+## Observações
+
+- A persistência é em memória; os dados são perdidos ao reiniciar a aplicação.
+- Não há banco de dados, SQLAlchemy ou Alembic no fluxo atual.
+- Não existe endpoint `PATCH /tasks/{task_id}/complete` no router atual.
+- A chamada externa do `PriorityAdvisor` é opcional e sempre possui fallback local.
