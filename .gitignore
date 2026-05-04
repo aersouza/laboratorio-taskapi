@@ -122,3 +122,4 @@ dmypy.json
 
 # Local-only docs
 *.local.md
+docs/roteiro-demo-mvp-v1.md
