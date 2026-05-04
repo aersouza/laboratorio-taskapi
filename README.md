@@ -25,6 +25,10 @@ O MVP implementa operações CRUD para tarefas, sugestão automática de priorid
 - Pytest
 - Uvicorn
 
+Versão recomendada:
+
+- Python 3.11+
+
 ## Funcionalidades
 
 - Criar tarefa.
@@ -55,6 +59,10 @@ laboratorio-taskapi/
 │   ├── test_priority_advisor.py
 │   ├── test_task_routes.py
 │   └── test_task_service.py
+├── docs/
+│   └── diagramas.md
+├── .env.example
+├── Makefile
 ├── requirements.txt
 └── README.md
 ```
@@ -69,6 +77,8 @@ laboratorio-taskapi/
 | Repository | `app/repositories/task_repository.py` | Persistência em memória e operações CRUD. |
 | Models | `app/models/task.py` | Enums e schemas Pydantic usados pela implementação atual. |
 
+Diagramas complementares estão disponíveis em `docs/diagramas.md`.
+
 ## Instalação
 
 Clone o repositório e acesse o diretório do projeto:
@@ -81,33 +91,65 @@ cd laboratorio-taskapi
 Crie e ative um ambiente virtual:
 
 ```bash
-python -m venv venv
+python -m venv .venv
 ```
 
 Windows:
 
 ```bash
-.\venv\Scripts\activate
+.\.venv\Scripts\activate
 ```
 
 Linux/macOS:
 
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 ```
 
 Instale as dependências:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+Ou use o Makefile:
+
+```bash
+make install
+```
+
+Prepare as variáveis de ambiente opcionais:
+
+```bash
+cp .env.example .env
+```
+
+No Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+> O arquivo `.env` não é carregado automaticamente pela aplicação. Para habilitar a chamada externa do `PriorityAdvisor`, exporte as variáveis no ambiente antes de executar a API.
 
 ## Execução
 
 Execute a aplicação com Uvicorn:
 
 ```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
+```
+
+Ou use o Makefile:
+
+```bash
+make run
+```
+
+É possível customizar host e porta:
+
+```bash
+make run HOST=0.0.0.0 PORT=8080
 ```
 
 A documentação interativa fica disponível em:
@@ -120,6 +162,15 @@ Healthcheck:
 
 ```bash
 curl http://127.0.0.1:8000/health
+```
+
+Resposta esperada:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-05-03T20:26:01.699917-03:00"
+}
 ```
 
 ## Endpoints
@@ -146,6 +197,14 @@ Status esperado:
 201 Created
 ```
 
+Exemplo com `curl`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/ \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Corrigir bloqueio urgente","description":"Fluxo principal parado agora","status":"pendente"}'
+```
+
 ### Listar Tarefas
 
 ```http
@@ -156,6 +215,12 @@ Status esperado:
 
 ```text
 200 OK
+```
+
+Exemplo com `curl`:
+
+```bash
+curl "http://127.0.0.1:8000/tasks/?status=pendente&skip=0&limit=100"
 ```
 
 ### Buscar Tarefa por ID
@@ -246,8 +311,10 @@ Status esperados:
 
 O `PriorityAdvisor` sugere prioridade com duas estratégias:
 
-1. Chamada externa opcional via biblioteca `openai`, quando `OPENAI_API_KEY` estiver configurada.
-2. Heurística local como comportamento padrão ou fallback.
+1. Heurística local como comportamento padrão.
+2. Chamada externa opcional via biblioteca `openai`, quando `OPENAI_API_KEY` estiver configurada e a dependência opcional estiver instalada.
+
+Por padrão, a API funciona sem LLM externo. Se `OPENAI_API_KEY` não estiver definida, se a biblioteca `openai` não estiver instalada, se ocorrer erro ou timeout, o advisor usa a heurística local.
 
 Variáveis de ambiente suportadas:
 
@@ -256,6 +323,22 @@ Variáveis de ambiente suportadas:
 | `OPENAI_API_KEY` | vazio | Habilita chamada externa quando presente. |
 | `OPENAI_MODEL` | `gpt-3.5-turbo` | Modelo usado na chamada externa. |
 | `PRIORITY_ADVISOR_TIMEOUT` | `3` | Timeout da chamada externa em segundos. |
+
+Exemplo de `.env`:
+
+```env
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-3.5-turbo
+PRIORITY_ADVISOR_TIMEOUT=3
+```
+
+Para usar a chamada externa com a implementação atual, instale a dependência opcional compatível:
+
+```bash
+python -m pip install openai==0.28.1
+```
+
+> A implementação atual usa a API legada `ChatCompletion.create`. Antes de uso produtivo, recomenda-se atualizar o `PriorityAdvisor` para o SDK moderno da OpenAI.
 
 Heurística local:
 
@@ -266,18 +349,35 @@ Heurística local:
 | `média` | `melhoria`, `refator`, `refatoração`, `documentação`, `ajuste`, `revisão` |
 | `baixa` | Padrão quando nenhuma regra anterior é acionada. |
 
+Exemplos de entrada:
+
+| Payload | `priority_suggestion` |
+| --- | --- |
+| `{"title": "Corrigir bloqueio urgente"}` | `crítica` |
+| `{"title": "Resolver atraso importante"}` | `alta` |
+| `{"title": "Melhoria na documentação"}` | `média` |
+| `{"title": "Organizar backlog"}` | `baixa` |
+
+O campo `priority_suggestion` é informativo. O campo `priority`, quando enviado em atualização, representa a prioridade definida pelo cliente.
+
 ## Testes
 
 Execute todas as suítes atuais:
 
 ```bash
-pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py
+python -m pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py
+```
+
+Ou use o Makefile:
+
+```bash
+make test
 ```
 
 Execute com cobertura:
 
 ```bash
-pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py --cov=app
+python -m pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py --cov=app
 ```
 
 Suítes disponíveis:
@@ -286,15 +386,16 @@ Suítes disponíveis:
 | --- | --- |
 | `tests/test_task_service.py` | CRUD do `TaskService` e casos de ID inexistente. |
 | `tests/test_priority_advisor.py` | Heurística local, parse de prioridade e fallback. |
-| `tests/test_task_routes.py` | Status HTTP `201`, `200`, `204` e `404` com `TestClient`. |
+| `tests/test_task_routes.py` | Status HTTP `201`, `200`, `204`, `404`, validações `422` e sugestões `alta`/`média` com `TestClient`. |
 
 ## Limitações
 
 - O repositório atual é em memória; os dados são perdidos ao reiniciar a aplicação.
 - Não há autenticação ou autorização.
 - Não há controle de concorrência para o repositório em memória.
-- A integração externa do `PriorityAdvisor` depende da biblioteca `openai` estar instalada e configurada.
-- O modelo externo configurado por padrão é legado e deve ser revisado antes de uso produtivo.
+- A integração externa do `PriorityAdvisor` depende da biblioteca opcional `openai` estar instalada e configurada.
+- O `.env` não é carregado automaticamente; as variáveis devem existir no ambiente do processo.
+- O cliente OpenAI usado no código atual é legado e deve ser revisado antes de uso produtivo.
 - Os warnings de depreciação atuais indicam pontos futuros de manutenção em `datetime.utcnow()` e dependências FastAPI/Starlette/httpx.
 
 ## Próximos Passos
@@ -303,5 +404,5 @@ Suítes disponíveis:
 - Trocar `datetime.utcnow()` por datetimes timezone-aware.
 - Adicionar autenticação com JWT ou API key.
 - Adicionar logs estruturados e middleware de correlação.
-- Criar configuração por ambiente com `.env`.
+- Carregar configuração por ambiente automaticamente a partir de `.env`.
 - Adicionar pipeline de CI para testes e cobertura.
