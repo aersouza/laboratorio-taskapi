@@ -119,3 +119,6 @@ dmypy.json
 
 # Database
 *.db
+
+# Local-only docs
+*.local.md
