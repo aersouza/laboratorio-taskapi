@@ -4,6 +4,8 @@ Micro-API de tarefas construída com FastAPI, organizada em camadas e com sugest
 
 O MVP implementa operações CRUD para tarefas, sugestão automática de prioridade e testes automatizados para serviço, advisor e rotas.
 
+Esta versão não utiliza banco de dados, ORM ou migrações. A persistência ativa do MVP é em memória, via `TaskRepository`.
+
 ## Sumário
 
 - [Stack](#stack)
@@ -28,6 +30,12 @@ O MVP implementa operações CRUD para tarefas, sugestão automática de priorid
 Versão recomendada:
 
 - Python 3.11+
+
+Fora do escopo atual:
+
+- SQLAlchemy
+- Alembic
+- SQLite ou outro banco persistente
 
 ## Funcionalidades
 
@@ -79,6 +87,8 @@ laboratorio-taskapi/
 
 Diagramas complementares estão disponíveis em `docs/diagramas.md`.
 
+> Não há camada de banco nesta versão. `TaskRepository` usa um `dict[int, TaskOut]` em memória e os dados são descartados quando o processo reinicia.
+
 ## Instalação
 
 Clone o repositório e acesse o diretório do projeto:
@@ -117,6 +127,8 @@ Ou use o Makefile:
 ```bash
 make install
 ```
+
+O `requirements.txt` contém apenas dependências necessárias para a API, testes e execução local. Não há dependências de banco de dados ou migração.
 
 Prepare as variáveis de ambiente opcionais:
 
