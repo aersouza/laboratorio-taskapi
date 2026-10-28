@@ -65,6 +65,8 @@ laboratorio-taskapi/
 │   └── main.py
 ├── tests/
 │   ├── test_priority_advisor.py
+│   ├── test_task_integration_prompt1.py
+│   ├── test_task_error_scenarios_prompt2.py
 │   ├── test_task_routes.py
 │   └── test_task_service.py
 ├── docs/
@@ -285,6 +287,41 @@ Status esperados:
 404 Not Found
 ```
 
+### Contratos de validação e erros
+
+Os testes de integração em `tests/test_task_integration_prompt1.py` e
+`tests/test_task_error_scenarios_prompt2.py` validam os seguintes contratos:
+
+| Situação | Endpoint | Status | Resposta esperada |
+| --- | --- | --- | --- |
+| Criar tarefa válida | `POST /tasks/` | `201 Created` | Objeto com `id`, `title`, `description` e `status`. |
+| Listar tarefas | `GET /tasks/` | `200 OK` | Lista de tarefas. |
+| Título vazio ou ausente | `POST /tasks/` | `422 Unprocessable Entity` | Corpo com `detail` e a localização do erro em `body.title`. |
+| Status inválido | `POST /tasks/` | `422 Unprocessable Entity` | Corpo com `detail` e a localização do erro em `body.status`. |
+| ID com formato inválido | `GET /tasks/{task_id}` | `422 Unprocessable Entity` | Corpo com `detail` e a localização do erro em `path.task_id`. |
+| Tarefa inexistente | `GET /tasks/{task_id}` | `404 Not Found` | `{"detail": "Task not found"}`. |
+| Atualização de tarefa inexistente | `PUT /tasks/{task_id}` | `404 Not Found` | `{"detail": "Task not found"}`. |
+| Exclusão de tarefa inexistente | `DELETE /tasks/{task_id}` | `404 Not Found` | `{"detail": "Task not found"}`. |
+
+O payload mínimo para criação contém `title`, que deve ter entre 1 e 100
+caracteres. `description` é opcional e aceita até 500 caracteres. `status` é
+opcional e, quando informado, deve ser `pendente`, `em_progresso` ou
+`concluida`.
+
+Erros de validação são retornados pelo FastAPI no formato:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "title"],
+      "msg": "Field required",
+      "type": "missing"
+    }
+  ]
+}
+```
+
 ## Modelo de Dados
 
 ### Status
@@ -374,10 +411,25 @@ O campo `priority_suggestion` é informativo. O campo `priority`, quando enviado
 
 ## Testes
 
-Execute todas as suítes atuais:
+Execute todas as suítes unitárias e de integração:
 
 ```bash
-python -m pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py
+python -m pytest tests/
+```
+
+Para executar somente os testes de integração adicionados a partir dos
+prompts:
+
+```bash
+python -m pytest \
+  tests/test_task_integration_prompt1.py \
+  tests/test_task_error_scenarios_prompt2.py
+```
+
+No PowerShell, o mesmo comando pode ser executado em uma linha:
+
+```powershell
+python -m pytest tests/test_task_integration_prompt1.py tests/test_task_error_scenarios_prompt2.py
 ```
 
 Ou use o Makefile:
@@ -389,7 +441,7 @@ make test
 Execute com cobertura:
 
 ```bash
-python -m pytest tests/test_task_service.py tests/test_priority_advisor.py tests/test_task_routes.py --cov=app
+python -m pytest tests/ --cov=app
 ```
 
 Suítes disponíveis:
@@ -399,6 +451,17 @@ Suítes disponíveis:
 | `tests/test_task_service.py` | CRUD do `TaskService` e casos de ID inexistente. |
 | `tests/test_priority_advisor.py` | Heurística local, parse de prioridade e fallback. |
 | `tests/test_task_routes.py` | Status HTTP `201`, `200`, `204`, `404`, validações `422` e sugestões `alta`/`média` com `TestClient`. |
+| `tests/test_task_integration_prompt1.py` | Criação (`201`) e listagem (`200`) de tarefas válidas com `TestClient`. |
+| `tests/test_task_error_scenarios_prompt2.py` | Payload ausente ou inválido (`422`), ID malformado (`422`) e tarefas inexistentes (`404`). |
+
+Os prompts usados como origem dos cenários ficam em `prompts/`:
+
+- `prompts/01-prompt-fewshot-contrato.md`: caminho feliz de criação e listagem.
+- `prompts/02-prompt-cot-casos-de-erro.md`: validações, IDs inexistentes e erros de contrato.
+
+Os testes Python usam `TestClient` e substituem o `TaskService` por uma
+instância isolada com `TaskRepository` em memória. Cada teste começa com um
+repositório novo e não depende de dados persistidos por outra execução.
 
 ## Limitações
 
